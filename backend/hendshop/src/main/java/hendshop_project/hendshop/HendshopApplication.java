@@ -1,13 +1,15 @@
-package hendshop_project.hendshop;
+package kz.handshop;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 
 @SpringBootApplication
-public class HendshopApplication {
+@EnableJpaAuditing // @CreatedTimestamp @UpdateTimestamp
+public class HandShopApplication {
 
-	public static void main(String[] args) {
-		SpringApplication.run(HendshopApplication.class, args);
-	}
+    public static void main(String[] args) {
+        SpringApplication.run(HandShopApplication.class, args);
+    }
 
 }
