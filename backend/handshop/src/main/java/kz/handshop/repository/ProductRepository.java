@@ -1,6 +1,8 @@
 package kz.handshop.repository;
 
-import kz.handshop.model.Product;
+import kz.handshop.entity.Product;
+import kz.handshop.entity.ProductStatus;
+import kz.handshop.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -9,26 +11,16 @@ import java.util.List;
 
 @Repository
 public interface ProductRepository extends JpaRepository<Product, Long> {
-
-    List<Product> findByStatus(Product.ProductStatus status);
+    List<Product> findByStatus(ProductStatus status);
+    List<Product> findByFreelancer(User freelancer);
     List<Product> findByFreelancerId(Long freelancerId);
-    List<Product> findByFreelancerIdAndStatus(Long freelancerId, Product.ProductStatus status);
-    List<Product> findByShelfId(Long shelfId);
+    List<Product> findByFreelancerIdAndStatus(Long freelancerId, ProductStatus status);
 
-    @Query("SELECT p FROM Product p WHERE p.status = 'PUBLISHED' AND LOWER(p.title) LIKE LOWER(CONCAT('%', :query, '%'))")
-    List<Product> searchPublished(@Param("query") String query);
+    @Query("SELECT p FROM Product p WHERE p.status = 'PUBLISHED' AND " +
+            "(:categoryId IS NULL OR p.shelf.globalCategory.id = :categoryId) AND " +
+            "(:search IS NULL OR LOWER(p.title) LIKE LOWER(CONCAT('%', :search, '%')))")
+    List<Product> findPublishedProducts(@Param("categoryId") Long categoryId,
+                                        @Param("search") String search);
 
-    @Query("SELECT p FROM Product p WHERE p.status = 'MODERATION' ORDER BY p.createdAt ASC")
-    List<Product> findPendingModeration();
-
-    List<Product> findByStatusOrderByReportsCountDesc(Product.ProductStatus status);
-
-    @Query("SELECT p FROM Product p WHERE p.status = 'PUBLISHED' ORDER BY p.viewsCount DESC")
-    List<Product> findTopViewed();
-
-    @Query("SELECT p FROM Product p WHERE p.freelancer.id = :freelancerId AND p.shelf.globalCategory.id = :categoryId")
-    List<Product> findByFreelancerAndCategory(
-            @Param("freelancerId") Long freelancerId,
-            @Param("categoryId") Long categoryId
-    );
+    List<Product> findByStatusAndReportsCountGreaterThanEqual(ProductStatus status, Integer reportsCount);
 }

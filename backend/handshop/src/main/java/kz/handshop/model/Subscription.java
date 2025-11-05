@@ -1,18 +1,10 @@
-package kz.handshop.model;
+package kz.handshop.entity;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
-
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "subscriptions")
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
 public class Subscription {
 
     @Id
@@ -20,31 +12,66 @@ public class Subscription {
     private Long id;
 
     @OneToOne
-    @JoinColumn(name = "user_id", nullable = false, unique = true)
+    @JoinColumn(name = "user_id", unique = true)
     private User user;
 
-    @Column(name = "is_active", nullable = false)
+    @Column(name = "is_active")
     private Boolean isActive = false;
 
-    @CreationTimestamp
     @Column(name = "started_at")
-    private LocalDateTime startedAt;
+    private LocalDateTime startedAt = LocalDateTime.now();
 
     @Column(name = "expires_at")
     private LocalDateTime expiresAt;
 
-    // Helper методы
-    public boolean isExpired() {
-        return expiresAt != null && LocalDateTime.now().isAfter(expiresAt);
+    // Constructors
+    public Subscription() {
     }
 
-    public void activate() {
-        this.isActive = true;
-        this.startedAt = LocalDateTime.now();
-        this.expiresAt = LocalDateTime.now().plusMonths(1); // Месячная подписка
+    public Subscription(User user, Boolean isActive, LocalDateTime expiresAt) {
+        this.user = user;
+        this.isActive = isActive;
+        this.expiresAt = expiresAt;
     }
 
-    public void deactivate() {
-        this.isActive = false;
+    // Getters and Setters
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public User getUser() {
+        return user;
+    }
+
+    public void setUser(User user) {
+        this.user = user;
+    }
+
+    public Boolean getIsActive() {
+        return isActive;
+    }
+
+    public void setIsActive(Boolean isActive) {
+        this.isActive = isActive;
+    }
+
+    public LocalDateTime getStartedAt() {
+        return startedAt;
+    }
+
+    public void setStartedAt(LocalDateTime startedAt) {
+        this.startedAt = startedAt;
+    }
+
+    public LocalDateTime getExpiresAt() {
+        return expiresAt;
+    }
+
+    public void setExpiresAt(LocalDateTime expiresAt) {
+        this.expiresAt = expiresAt;
     }
 }

@@ -1,313 +1,253 @@
 package kz.handshop.service;
 
-import kz.handshop.exception.*;
-import kz.handshop.model.*;
+import kz.handshop.dto.request.CreateProductRequest;
+import kz.handshop.dto.response.*;
+import kz.handshop.entity.*;
+import kz.handshop.exception.ForbiddenException;
+import kz.handshop.exception.InvalidStatusException;
+import kz.handshop.exception.ProductNotFoundException;
+import kz.handshop.exception.ShelfNotFoundException;
 import kz.handshop.repository.*;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 public class ProductService {
 
-    private final ProductRepository productRepository;
-    private final ProductModerationRepository moderationRepository;
-    private final ProductReportRepository reportRepository;
-    private final UserRepository userRepository;
+    @Autowired
+    private ProductRepository productRepository;
 
-    // ===============================
-    // CRUD операции
-    // ===============================
+    @Autowired
+    private FreelancerShelfRepository shelfRepository;
 
-    /**
-     * Создание нового товара (черновик)
-     */
-    @Transactional
-    public Product createProduct(Product product, Long freelancerId) {
-        User freelancer = userRepository.findById(freelancerId)
-                .orElseThrow(() -> new UserNotFoundException("Фрилансер не найден"));
+    @Autowired
+    private ProductImageRepository productImageRepository;
 
-        if (!freelancer.isFreelancer()) {
-            throw new ForbiddenException("Только фрилансеры могут создавать товары");
-        }
+    @Autowired
+    private ProductModerationRepository moderationRepository;
 
-        product.setFreelancer(freelancer);
-        product.setStatus(Product.ProductStatus.DRAFT);
-        product.setViewsCount(0);
-        product.setReportsCount(0);
+    @Autowired
+    private ProductReviewRepository reviewRepository;
 
-        return productRepository.save(product);
+    @Autowired
+    private UserRepository userRepository;
+
+    // Получить все опубликованные товары (публичный endpoint)
+    public List<ProductResponse> getAllPublishedProducts(Long categoryId, String search) {
+        List<Product> products = productRepository.findPublishedProducts(categoryId, search);
+        return products.stream()
+                .map(this::convertToResponse)
+                .collect(Collectors.toList());
     }
 
-    /**
-     * Обновление товара (только в статусах DRAFT или EDIT_MODERATION)
-     */
+    // Получить товар по ID
     @Transactional
-    public Product updateProduct(Long productId, Product updatedProduct, Long freelancerId) {
-        Product product = getProductById(productId);
-
-        // Проверка прав доступа
-        if (!product.getFreelancer().getId().equals(freelancerId)) {
-            throw new ForbiddenException("Вы не можете редактировать этот товар");
-        }
-
-        // Можно редактировать только черновики и товары на доработке
-        if (product.getStatus() != Product.ProductStatus.DRAFT
-                && product.getStatus() != Product.ProductStatus.EDIT_MODERATION) {
-            throw new InvalidStatusException("Товар нельзя редактировать в текущем статусе");
-        }
-
-        // Обновление полей
-        product.setTitle(updatedProduct.getTitle());
-        product.setDescription(updatedProduct.getDescription());
-        product.setMaterials(updatedProduct.getMaterials());
-        product.setPrice(updatedProduct.getPrice());
-        product.setProductionTime(updatedProduct.getProductionTime());
-        product.setDeliveryType(updatedProduct.getDeliveryType());
-
-        return productRepository.save(product);
-    }
-
-    /**
-     * Получение товара по ID
-     */
-    public Product getProductById(Long id) {
-        return productRepository.findById(id)
+    public ProductResponse getProductById(Long id) {
+        Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ProductNotFoundException("Товар не найден"));
+
+        // Увеличить счётчик просмотров
+        product.setViewsCount(product.getViewsCount() + 1);
+        productRepository.save(product);
+
+        return convertToDetailedResponse(product);
     }
 
-    /**
-     * Получение всех опубликованных товаров
-     */
-    public List<Product> getAllPublishedProducts() {
-        return productRepository.findByStatus(Product.ProductStatus.PUBLISHED);
-    }
-
-    /**
-     * Получение товаров фрилансера
-     */
-    public List<Product> getFreelancerProducts(Long freelancerId) {
-        return productRepository.findByFreelancerId(freelancerId);
-    }
-
-    // ===============================
-    // Управление статусами
-    // ===============================
-
-    /**
-     * Отправка товара на модерацию
-     */
+    // Создать товар (DRAFT)
     @Transactional
-    public Product submitForModeration(Long productId, Long freelancerId) {
-        Product product = getProductById(productId);
+    public ProductResponse createProduct(CreateProductRequest request, User freelancer) {
+        Product product = new Product();
+        product.setFreelancer(freelancer);
+        product.setTitle(request.getTitle());
+        product.setDescription(request.getDescription());
+        product.setMaterials(request.getMaterials());
+        product.setPrice(request.getPrice());
+        product.setProductionTime(request.getProductionTime());
+        product.setDeliveryType(DeliveryType.valueOf(request.getDeliveryType()));
+        product.setStatus(ProductStatus.DRAFT);
 
-        // Проверка прав
-        if (!product.getFreelancer().getId().equals(freelancerId)) {
-            throw new ForbiddenException("Вы не можете отправить этот товар на модерацию");
+        if (request.getShelfId() != null) {
+            FreelancerShelf shelf = shelfRepository.findById(request.getShelfId())
+                    .orElseThrow(() -> new ShelfNotFoundException("Полка не найдена"));
+
+            if (!shelf.getFreelancer().getId().equals(freelancer.getId())) {
+                throw new ForbiddenException("Полка принадлежит другому фрилансеру");
+            }
+
+            product.setShelf(shelf);
         }
 
-        // Проверка статуса
-        if (!product.canSubmitForModeration()) {
-            throw new InvalidStatusException("Товар нельзя отправить на модерацию. Проверьте заполненность всех полей.");
+        product = productRepository.save(product);
+        return convertToResponse(product);
+    }
+
+    // Обновить товар
+    @Transactional
+    public ProductResponse updateProduct(Long productId, CreateProductRequest request, User freelancer) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new ProductNotFoundException("Товар не найден"));
+
+        if (!product.getFreelancer().getId().equals(freelancer.getId())) {
+            throw new ForbiddenException("Вы не можете редактировать чужой товар");
         }
 
-        // Смена статуса
-        product.setStatus(Product.ProductStatus.MODERATION);
+        if (product.getStatus() != ProductStatus.DRAFT && product.getStatus() != ProductStatus.EDIT_MODERATION) {
+            throw new InvalidStatusException("Можно редактировать только товары в статусе DRAFT или EDIT_MODERATION");
+        }
+
+        product.setTitle(request.getTitle());
+        product.setDescription(request.getDescription());
+        product.setMaterials(request.getMaterials());
+        product.setPrice(request.getPrice());
+        product.setProductionTime(request.getProductionTime());
+        product.setDeliveryType(DeliveryType.valueOf(request.getDeliveryType()));
+
+        if (request.getShelfId() != null) {
+            FreelancerShelf shelf = shelfRepository.findById(request.getShelfId())
+                    .orElseThrow(() -> new ShelfNotFoundException("Полка не найдена"));
+            product.setShelf(shelf);
+        }
+
+        product = productRepository.save(product);
+        return convertToResponse(product);
+    }
+
+    // Отправить товар на модерацию
+    @Transactional
+    public ProductResponse submitForModeration(Long productId, User freelancer) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new ProductNotFoundException("Товар не найден"));
+
+        if (!product.getFreelancer().getId().equals(freelancer.getId())) {
+            throw new ForbiddenException("Вы не можете модерировать чужой товар");
+        }
+
+        if (product.getStatus() != ProductStatus.DRAFT && product.getStatus() != ProductStatus.EDIT_MODERATION) {
+            throw new InvalidStatusException("Можно отправить на модерацию только товары в статусе DRAFT или EDIT_MODERATION");
+        }
+
+        product.setStatus(ProductStatus.MODERATION);
         product = productRepository.save(product);
 
-        // Запись в историю модерации
+        // Создать запись в модерации
         ProductModeration moderation = new ProductModeration();
         moderation.setProduct(product);
-        moderation.setAction(ProductModeration.ModerationAction.SUBMIT);
+        moderation.setAdmin(null);
+        moderation.setAction(ModerationAction.SUBMIT);
         moderationRepository.save(moderation);
 
-        return product;
+        return convertToResponse(product);
     }
 
-    /**
-     * Одобрение товара админом
-     */
+    // Архивировать товар
     @Transactional
-    public Product approveProduct(Long productId, Long adminId) {
-        Product product = getProductById(productId);
-        User admin = getUserById(adminId);
+    public ProductResponse archiveProduct(Long productId, User freelancer) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new ProductNotFoundException("Товар не найден"));
 
-        if (!admin.isAdmin()) {
-            throw new ForbiddenException("Только админы могут одобрять товары");
+        if (!product.getFreelancer().getId().equals(freelancer.getId())) {
+            throw new ForbiddenException("Вы не можете архивировать чужой товар");
         }
 
-        if (product.getStatus() != Product.ProductStatus.MODERATION) {
-            throw new InvalidStatusException("Товар не находится на модерации");
-        }
-
-        product.setStatus(Product.ProductStatus.PUBLISHED);
-        product = productRepository.save(product);
-
-        // Запись в историю
-        ProductModeration moderation = new ProductModeration();
-        moderation.setProduct(product);
-        moderation.setAdmin(admin);
-        moderation.setAction(ProductModeration.ModerationAction.APPROVE);
-        moderationRepository.save(moderation);
-
-        return product;
-    }
-
-    /**
-     * Отклонение товара админом
-     */
-    @Transactional
-    public Product rejectProduct(Long productId, Long adminId, String comment) {
-        Product product = getProductById(productId);
-        User admin = getUserById(adminId);
-
-        if (!admin.isAdmin()) {
-            throw new ForbiddenException("Только админы могут отклонять товары");
-        }
-
-        if (product.getStatus() != Product.ProductStatus.MODERATION) {
-            throw new InvalidStatusException("Товар не находится на модерации");
-        }
-
-        if (comment == null || comment.trim().isEmpty()) {
-            throw new ValidationException("Комментарий обязателен при отклонении товара");
-        }
-
-        product.setStatus(Product.ProductStatus.EDIT_MODERATION);
-        product = productRepository.save(product);
-
-        // Запись в историю
-        ProductModeration moderation = new ProductModeration();
-        moderation.setProduct(product);
-        moderation.setAdmin(admin);
-        moderation.setAction(ProductModeration.ModerationAction.REJECT);
-        moderation.setComment(comment);
-        moderationRepository.save(moderation);
-
-        return product;
-    }
-
-    /**
-     * Архивирование товара
-     */
-    @Transactional
-    public Product archiveProduct(Long productId, Long freelancerId) {
-        Product product = getProductById(productId);
-
-        if (!product.getFreelancer().getId().equals(freelancerId)) {
-            throw new ForbiddenException("Вы не можете архивировать этот товар");
-        }
-
-        if (product.getStatus() != Product.ProductStatus.PUBLISHED) {
+        if (product.getStatus() != ProductStatus.PUBLISHED) {
             throw new InvalidStatusException("Можно архивировать только опубликованные товары");
         }
 
-        product.setStatus(Product.ProductStatus.ARCHIVED);
-        return productRepository.save(product);
-    }
-
-    /**
-     * Восстановление из архива
-     */
-    @Transactional
-    public Product restoreFromArchive(Long productId, Long freelancerId) {
-        Product product = getProductById(productId);
-
-        if (!product.getFreelancer().getId().equals(freelancerId)) {
-            throw new ForbiddenException("Вы не можете восстановить этот товар");
-        }
-
-        if (product.getStatus() != Product.ProductStatus.ARCHIVED) {
-            throw new InvalidStatusException("Товар не находится в архиве");
-        }
-
-        product.setStatus(Product.ProductStatus.PUBLISHED);
-        return productRepository.save(product);
-    }
-
-    /**
-     * Разблокировка товара админом (жалобы необоснованы)
-     */
-    @Transactional
-    public Product unblockProduct(Long productId, Long adminId) {
-        Product product = getProductById(productId);
-        User admin = getUserById(adminId);
-
-        if (!admin.isAdmin()) {
-            throw new ForbiddenException("Только админы могут разблокировать товары");
-        }
-
-        if (product.getStatus() != Product.ProductStatus.BLOCKED) {
-            throw new InvalidStatusException("Товар не заблокирован");
-        }
-
-        product.setStatus(Product.ProductStatus.PUBLISHED);
-        product.setReportsCount(0); // Сброс счётчика жалоб
+        product.setStatus(ProductStatus.ARCHIVED);
         product = productRepository.save(product);
 
-        // Помечаем все жалобы как проверенные
-        List<ProductReport> reports = reportRepository.findByProductId(productId);
-        reports.forEach(report -> report.setIsReviewed(true));
-        reportRepository.saveAll(reports);
-
-        // Запись в историю
-        ProductModeration moderation = new ProductModeration();
-        moderation.setProduct(product);
-        moderation.setAdmin(admin);
-        moderation.setAction(ProductModeration.ModerationAction.UNBLOCK);
-        moderationRepository.save(moderation);
-
-        return product;
+        return convertToResponse(product);
     }
 
-    /**
-     * Удаление товара админом (после блокировки)
-     */
+    // Восстановить из архива
     @Transactional
-    public Product deleteProduct(Long productId, Long adminId) {
-        Product product = getProductById(productId);
-        User admin = getUserById(adminId);
+    public ProductResponse restoreProduct(Long productId, User freelancer) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new ProductNotFoundException("Товар не найден"));
 
-        if (!admin.isAdmin()) {
-            throw new ForbiddenException("Только админы могут удалять товары");
+        if (!product.getFreelancer().getId().equals(freelancer.getId())) {
+            throw new ForbiddenException("Вы не можете восстановить чужой товар");
         }
 
-        if (product.getStatus() != Product.ProductStatus.BLOCKED) {
-            throw new InvalidStatusException("Можно удалить только заблокированные товары");
+        if (product.getStatus() != ProductStatus.ARCHIVED) {
+            throw new InvalidStatusException("Можно восстановить только архивные товары");
         }
 
-        product.setStatus(Product.ProductStatus.DELETED);
+        product.setStatus(ProductStatus.PUBLISHED);
         product = productRepository.save(product);
 
-        // Запись в историю
-        ProductModeration moderation = new ProductModeration();
-        moderation.setProduct(product);
-        moderation.setAdmin(admin);
-        moderation.setAction(ProductModeration.ModerationAction.DELETE);
-        moderationRepository.save(moderation);
-
-        return product;
+        return convertToResponse(product);
     }
 
-    // ===============================
-    // Helper методы
-    // ===============================
-
-    private User getUserById(Long id) {
-        return userRepository.findById(id)
-                .orElseThrow(() -> new UserNotFoundException("Пользователь не найден"));
+    // Получить товары фрилансера
+    public List<ProductResponse> getFreelancerProducts(User freelancer, ProductStatus status) {
+        List<Product> products;
+        if (status != null) {
+            products = productRepository.findByFreelancerIdAndStatus(freelancer.getId(), status);
+        } else {
+            products = productRepository.findByFreelancer(freelancer);
+        }
+        return products.stream()
+                .map(this::convertToResponse)
+                .collect(Collectors.toList());
     }
 
-    /**
-     * Увеличение счётчика просмотров
-     */
-    @Transactional
-    public void incrementViews(Long productId) {
-        Product product = getProductById(productId);
-        product.incrementViews();
-        productRepository.save(product);
+    // Конвертация в Response
+    private ProductResponse convertToResponse(Product product) {
+        ProductResponse response = new ProductResponse();
+        response.setId(product.getId());
+        response.setTitle(product.getTitle());
+        response.setDescription(product.getDescription());
+        response.setMaterials(product.getMaterials());
+        response.setPrice(product.getPrice());
+        response.setProductionTime(product.getProductionTime());
+        response.setDeliveryType(product.getDeliveryType() != null ? product.getDeliveryType().name() : null);
+        response.setStatus(product.getStatus().name());
+        response.setViewsCount(product.getViewsCount());
+        response.setReportsCount(product.getReportsCount());
+        response.setCreatedAt(product.getCreatedAt());
+        response.setUpdatedAt(product.getUpdatedAt());
+
+        // Freelancer
+        SimpleUserResponse freelancerResponse = new SimpleUserResponse();
+        freelancerResponse.setId(product.getFreelancer().getId());
+        freelancerResponse.setUsername(product.getFreelancer().getUsername());
+        freelancerResponse.setAvatarUrl(product.getFreelancer().getAvatarUrl());
+        response.setFreelancer(freelancerResponse);
+
+        // Images
+        List<ProductImage> images = productImageRepository.findByProduct(product);
+        List<ProductImageResponse> imageResponses = images.stream()
+                .map(img -> {
+                    ProductImageResponse imgResp = new ProductImageResponse();
+                    imgResp.setId(img.getId());
+                    imgResp.setImageUrl(img.getImageUrl());
+                    imgResp.setIsPrimary(img.getIsPrimary());
+                    imgResp.setOrderIndex(img.getOrderIndex());
+                    return imgResp;
+                })
+                .collect(Collectors.toList());
+        response.setImages(imageResponses);
+
+        return response;
+    }
+
+    private ProductResponse convertToDetailedResponse(Product product) {
+        ProductResponse response = convertToResponse(product);
+
+        // Добавить рейтинг и отзывы
+        BigDecimal avgRating = reviewRepository.getAverageRatingByProductId(product.getId());
+        response.setAverageRating(avgRating);
+
+        List<ProductReview> reviews = reviewRepository.findByProduct(product);
+        response.setReviewsCount(reviews.size());
+
+        return response;
     }
 }

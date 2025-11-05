@@ -1,14 +1,20 @@
 package kz.handshop.dto.request;
 
-import jakarta.validation.constraints.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import jakarta.validation.constraints.NotBlank;
 
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
 public class RejectProductRequest {
-    @NotBlank(message = "Комментарий обязателен при отклонении")
+
+    @NotBlank(message = "Комментарий обязателен")
     private String comment;
+
+    public RejectProductRequest() {
+    }
+
+    public String getComment() {
+        return comment;
+    }
+
+    public void setComment(String comment) {
+        this.comment = comment;
+    }
 }

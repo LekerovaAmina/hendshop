@@ -1,28 +1,11 @@
-package kz.handshop.model;
+package kz.handshop.entity;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.Getter;
-import lombok.Setter;
-import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
-
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
 
 @Entity
 @Table(name = "products")
-@Getter
-@Setter
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
 public class Product {
 
     @Id
@@ -30,14 +13,14 @@ public class Product {
     private Long id;
 
     @ManyToOne
-    @JoinColumn(name = "freelancer_id", nullable = false)
+    @JoinColumn(name = "freelancer_id")
     private User freelancer;
 
     @ManyToOne
     @JoinColumn(name = "shelf_id")
     private FreelancerShelf shelf;
 
-    @Column
+    @Column(length = 255)
     private String title;
 
     @Column(columnDefinition = "TEXT")
@@ -50,140 +33,153 @@ public class Product {
     private BigDecimal price;
 
     @Column(name = "production_time")
-    private Integer productionTime; // в днях
+    private Integer productionTime;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "delivery_type")
+    @Column(name = "delivery_type", length = 20)
     private DeliveryType deliveryType;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(columnDefinition = "product_status")
     private ProductStatus status = ProductStatus.DRAFT;
 
     @Column(name = "views_count")
     private Integer viewsCount = 0;
 
     @Column(name = "reports_count")
-    private Integer reportsCount = 0; // Счётчик жалоб
+    private Integer reportsCount = 0;
 
-    @CreationTimestamp
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    @Column(name = "created_at")
+    private LocalDateTime createdAt = LocalDateTime.now();
 
-    @UpdateTimestamp
     @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
+    private LocalDateTime updatedAt = LocalDateTime.now();
 
-    // Связь один-ко-многим с изображениями
-    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
-    @OrderBy("orderIndex ASC")
-    private List<ProductImage> images = new ArrayList<>();
-
-    // Связь один-ко-многим с модерациями
-    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL)
-    private Set<ProductModeration> moderations = new HashSet<>();
-
-    // Связь один-ко-многим с жалобами
-    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
-    private Set<ProductReport> reports = new HashSet<>();
-
-    // Связь один-ко-многим с избранным
-    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
-    private Set<Favorite> favorites = new HashSet<>();
-
-    // Связь один-ко-многим с заказами
-    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL)
-    private Set<Order> orders = new HashSet<>();
-
-    // Связь один-ко-многим с отзывами
-    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
-    private Set<ProductReview> reviews = new HashSet<>();
-
-    public enum ProductStatus {
-        DRAFT,              // Черновик
-        MODERATION,         // На модерации
-        EDIT_MODERATION,    // Отправлен на доработку
-        PUBLISHED,          // Опубликован
-        ARCHIVED,           // В архиве
-        BLOCKED,            // Заблокирован (5+ жалоб)
-        DELETED             // Удалён админом
+    // Constructors
+    public Product() {
     }
 
-    public enum DeliveryType {
-        KAZPOST,
-        YANDEX
+    public Product(User freelancer, String title, BigDecimal price) {
+        this.freelancer = freelancer;
+        this.title = title;
+        this.price = price;
     }
 
-    // ===============================
-    // Helper методы
-    // ===============================
-
-    public void incrementViews() {
-        this.viewsCount++;
+    // Getters and Setters
+    public Long getId() {
+        return id;
     }
 
-    public String getPrimaryImageUrl() {
-        return images.stream()
-                .filter(image -> image.isPrimary())
-                .findFirst()
-                .map(image -> image.getImageUrl())
-                .orElse(null);
+    public void setId(Long id) {
+        this.id = id;
     }
 
-    public boolean isPublished() {
-        return status == ProductStatus.PUBLISHED;
+    public User getFreelancer() {
+        return freelancer;
     }
 
-    public boolean isBlocked() {
-        return status == ProductStatus.BLOCKED;
+    public void setFreelancer(User freelancer) {
+        this.freelancer = freelancer;
     }
 
-    public boolean isDeleted() {
-        return status == ProductStatus.DELETED;
+    public FreelancerShelf getShelf() {
+        return shelf;
     }
 
-    // Проверка заполненности всех обязательных полей
-    public boolean isComplete() {
-        return title != null && !title.trim().isEmpty()
-                && description != null && !description.trim().isEmpty()
-                && materials != null && !materials.trim().isEmpty()
-                && price != null && price.compareTo(BigDecimal.ZERO) > 0
-                && productionTime != null && productionTime > 0
-                && deliveryType != null
-                && !images.isEmpty(); // Хотя бы одно фото
+    public void setShelf(FreelancerShelf shelf) {
+        this.shelf = shelf;
     }
 
-    // Можно ли отправить на модерацию
-    public boolean canSubmitForModeration() {
-        return (status == ProductStatus.DRAFT || status == ProductStatus.EDIT_MODERATION)
-                && isComplete();
+    public String getTitle() {
+        return title;
     }
 
-    // Видим ли товар обычным пользователям
-    public boolean isVisibleToUsers() {
-        return status == ProductStatus.PUBLISHED;
+    public void setTitle(String title) {
+        this.title = title;
     }
 
-    // Автоблокировка при достижении 5 жалоб
-    public void checkAutoBlock() {
-        if (reportsCount >= 5 && status == ProductStatus.PUBLISHED) {
-            this.status = ProductStatus.BLOCKED;
-        }
+    public String getDescription() {
+        return description;
     }
 
-    // Получить средний рейтинг товара
-    public Double getAverageRating() {
-        if (reviews == null || reviews.isEmpty()) {
-            return 0.0;
-        }
-        return reviews.stream()
-                .mapToInt(review -> review.getRating())
-                .average()
-                .orElse(0.0);
+    public void setDescription(String description) {
+        this.description = description;
     }
 
-    // Получить количество отзывов
-    public int getReviewsCount() {
-        return reviews != null ? reviews.size() : 0;
+    public String getMaterials() {
+        return materials;
+    }
+
+    public void setMaterials(String materials) {
+        this.materials = materials;
+    }
+
+    public BigDecimal getPrice() {
+        return price;
+    }
+
+    public void setPrice(BigDecimal price) {
+        this.price = price;
+    }
+
+    public Integer getProductionTime() {
+        return productionTime;
+    }
+
+    public void setProductionTime(Integer productionTime) {
+        this.productionTime = productionTime;
+    }
+
+    public DeliveryType getDeliveryType() {
+        return deliveryType;
+    }
+
+    public void setDeliveryType(DeliveryType deliveryType) {
+        this.deliveryType = deliveryType;
+    }
+
+    public ProductStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(ProductStatus status) {
+        this.status = status;
+    }
+
+    public Integer getViewsCount() {
+        return viewsCount;
+    }
+
+    public void setViewsCount(Integer viewsCount) {
+        this.viewsCount = viewsCount;
+    }
+
+    public Integer getReportsCount() {
+        return reportsCount;
+    }
+
+    public void setReportsCount(Integer reportsCount) {
+        this.reportsCount = reportsCount;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
+    }
+
+    @PreUpdate
+    public void preUpdate() {
+        this.updatedAt = LocalDateTime.now();
     }
 }

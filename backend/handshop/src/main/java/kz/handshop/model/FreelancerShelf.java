@@ -1,20 +1,10 @@
-package kz.handshop.model;
+package kz.handshop.entity;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
-
 import java.time.LocalDateTime;
-import java.util.HashSet;
-import java.util.Set;
 
 @Entity
 @Table(name = "freelancer_shelves")
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
 public class FreelancerShelf {
 
     @Id
@@ -22,24 +12,78 @@ public class FreelancerShelf {
     private Long id;
 
     @ManyToOne
-    @JoinColumn(name = "freelancer_id", nullable = false)
+    @JoinColumn(name = "freelancer_id")
     private User freelancer;
 
     @ManyToOne
-    @JoinColumn(name = "global_category_id", nullable = false)
+    @JoinColumn(name = "global_category_id")
     private GlobalCategory globalCategory;
 
-    @Column(name = "shelf_name", nullable = false)
-    private String shelfName; // "Зайчики", "Монстрики", "Куклы"
+    @Column(name = "shelf_name", nullable = false, length = 150)
+    private String shelfName;
 
-    @Column(name = "description", columnDefinition = "TEXT")
+    @Column(columnDefinition = "TEXT")
     private String description;
 
-    @CreationTimestamp
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    @Column(name = "created_at")
+    private LocalDateTime createdAt = LocalDateTime.now();
 
-    // Связь один-ко-многим с товарами
-    @OneToMany(mappedBy = "shelf", cascade = CascadeType.ALL, orphanRemoval = true)
-    private Set<Product> products = new HashSet<>();
+    // Constructors
+    public FreelancerShelf() {
+    }
+
+    public FreelancerShelf(User freelancer, GlobalCategory globalCategory, String shelfName) {
+        this.freelancer = freelancer;
+        this.globalCategory = globalCategory;
+        this.shelfName = shelfName;
+    }
+
+    // Getters and Setters
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public User getFreelancer() {
+        return freelancer;
+    }
+
+    public void setFreelancer(User freelancer) {
+        this.freelancer = freelancer;
+    }
+
+    public GlobalCategory getGlobalCategory() {
+        return globalCategory;
+    }
+
+    public void setGlobalCategory(GlobalCategory globalCategory) {
+        this.globalCategory = globalCategory;
+    }
+
+    public String getShelfName() {
+        return shelfName;
+    }
+
+    public void setShelfName(String shelfName) {
+        this.shelfName = shelfName;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
 }

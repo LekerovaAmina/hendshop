@@ -1,9 +1,21 @@
 package kz.handshop.service;
 
-import kz.handshop.exception.*;
-import kz.handshop.model.*;
-import kz.handshop.repository.*;
-import lombok.RequiredArgsConstructor;
+import kz.handshop.dto.request.LoginRequest;
+import kz.handshop.dto.request.RegisterFreelancerRequest;
+import kz.handshop.dto.request.RegisterRequest;
+import kz.handshop.dto.response.AuthResponse;
+import kz.handshop.dto.response.FreelancerProfileResponse;
+import kz.handshop.entity.*;
+import kz.handshop.exception.EmailAlreadyExistsException;
+import kz.handshop.repository.FreelancerProfileRepository;
+import kz.handshop.repository.SubscriptionRepository;
+import kz.handshop.repository.UserRepository;
+import kz.handshop.security.JwtTokenProvider;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -11,85 +23,153 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 
 @Service
-@RequiredArgsConstructor
 public class AuthService {
 
-    private final UserRepository userRepository;
-    private final FreelancerProfileRepository freelancerProfileRepository;
-    private final SubscriptionRepository subscriptionRepository;
-    private final PasswordEncoder passwordEncoder;
+    @Autowired
+    private UserRepository userRepository;
 
-    /**
-     * Регистрация обычного пользователя
-     */
+    @Autowired
+    private FreelancerProfileRepository freelancerProfileRepository;
+
+    @Autowired
+    private SubscriptionRepository subscriptionRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private AuthenticationManager authenticationManager;
+
+    @Autowired
+    private JwtTokenProvider jwtTokenProvider;
+
     @Transactional
-    public User registerUser(String email, String username, String password) {
+    public AuthResponse registerUser(RegisterRequest request) {
         // Проверка на существование email
-        if (userRepository.existsByEmail(email)) {
-            throw new EmailAlreadyExistsException("Email уже зарегистрирован");
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new EmailAlreadyExistsException("Email уже используется");
         }
 
         // Создание пользователя
         User user = new User();
-        user.setEmail(email);
-        user.setUsername(username);
-        user.setPasswordHash(passwordEncoder.encode(password));
-        user.setRole(User.Role.USER);
+        user.setEmail(request.getEmail());
+        user.setUsername(request.getUsername());
+        user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+        user.setRole(UserRole.USER);
 
-        return userRepository.save(user);
+        user = userRepository.save(user);
+
+        // Генерация токена
+        String token = jwtTokenProvider.generateTokenFromEmail(user.getEmail());
+
+        // Формирование ответа
+        AuthResponse response = new AuthResponse();
+        response.setId(user.getId());
+        response.setEmail(user.getEmail());
+        response.setUsername(user.getUsername());
+        response.setRole(user.getRole().name());
+        response.setToken(token);
+
+        return response;
     }
 
-    /**
-     * Регистрация фрилансера
-     */
     @Transactional
-    public User registerFreelancer(String email, String username, String password,
-                                   String shopName, String shopDescription) {
+    public AuthResponse registerFreelancer(RegisterFreelancerRequest request) {
         // Проверка на существование email
-        if (userRepository.existsByEmail(email)) {
-            throw new EmailAlreadyExistsException("Email уже зарегистрирован");
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new EmailAlreadyExistsException("Email уже используется");
         }
 
-        // Создание пользователя с ролью FREELANCER
+        // Создание пользователя
         User user = new User();
-        user.setEmail(email);
-        user.setUsername(username);
-        user.setPasswordHash(passwordEncoder.encode(password));
-        user.setRole(User.Role.FREELANCER);
+        user.setEmail(request.getEmail());
+        user.setUsername(request.getUsername());
+        user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+        user.setRole(UserRole.FREELANCER);
+
         user = userRepository.save(user);
 
         // Создание профиля фрилансера
         FreelancerProfile profile = new FreelancerProfile();
         profile.setUser(user);
-        profile.setShopName(shopName);
-        profile.setShopDescription(shopDescription);
-        profile.setOrderLimit(5); // По умолчанию 5 заказов
-        profile.setRating(0.0);
-        profile.setTotalOrders(0);
-        freelancerProfileRepository.save(profile);
+        profile.setShopName(request.getShopName());
+        profile.setShopDescription(request.getShopDescription());
+        profile.setOrderLimit(5);
 
-        // Создание подписки (активируется после оплаты)
+        profile = freelancerProfileRepository.save(profile);
+
+        // Создание активной подписки на 30 дней
         Subscription subscription = new Subscription();
         subscription.setUser(user);
-        subscription.setIsActive(true); // Для MVP сразу активна
+        subscription.setIsActive(true);
         subscription.setStartedAt(LocalDateTime.now());
-        subscription.setExpiresAt(LocalDateTime.now().plusMonths(1));
+        subscription.setExpiresAt(LocalDateTime.now().plusDays(30));
+
         subscriptionRepository.save(subscription);
 
-        return user;
+        // Генерация токена
+        String token = jwtTokenProvider.generateTokenFromEmail(user.getEmail());
+
+        // Формирование ответа
+        AuthResponse response = new AuthResponse();
+        response.setId(user.getId());
+        response.setEmail(user.getEmail());
+        response.setUsername(user.getUsername());
+        response.setRole(user.getRole().name());
+        response.setToken(token);
+
+        // Добавление информации о профиле фрилансера
+        FreelancerProfileResponse profileResponse = new FreelancerProfileResponse();
+        profileResponse.setId(profile.getId());
+        profileResponse.setShopName(profile.getShopName());
+        profileResponse.setShopDescription(profile.getShopDescription());
+        profileResponse.setOrderLimit(profile.getOrderLimit());
+        profileResponse.setRating(profile.getRating());
+        profileResponse.setTotalOrders(profile.getTotalOrders());
+
+        response.setFreelancerProfile(profileResponse);
+
+        return response;
     }
 
-    /**
-     * Аутентификация пользователя
-     */
-    public User login(String email, String password) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new UserNotFoundException("Неверный email или пароль"));
+    public AuthResponse login(LoginRequest request) {
+        // Аутентификация
+        Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
+        );
 
-        if (!passwordEncoder.matches(password, user.getPasswordHash())) {
-            throw new ValidationException("Неверный email или пароль");
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+
+        // Генерация токена
+        String token = jwtTokenProvider.generateToken(authentication);
+
+        // Получение пользователя
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // Формирование ответа
+        AuthResponse response = new AuthResponse();
+        response.setId(user.getId());
+        response.setEmail(user.getEmail());
+        response.setUsername(user.getUsername());
+        response.setRole(user.getRole().name());
+        response.setToken(token);
+
+        // Если фрилансер, добавить профиль
+        if (user.getRole() == UserRole.FREELANCER || user.getRole() == UserRole.ADMIN) {
+            freelancerProfileRepository.findByUser(user).ifPresent(profile -> {
+                FreelancerProfileResponse profileResponse = new FreelancerProfileResponse();
+                profileResponse.setId(profile.getId());
+                profileResponse.setShopName(profile.getShopName());
+                profileResponse.setShopDescription(profile.getShopDescription());
+                profileResponse.setOrderLimit(profile.getOrderLimit());
+                profileResponse.setRating(profile.getRating());
+                profileResponse.setTotalOrders(profile.getTotalOrders());
+
+                response.setFreelancerProfile(profileResponse);
+            });
         }
 
-        return user;
+        return response;
     }
 }

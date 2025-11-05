@@ -1,23 +1,44 @@
 package kz.handshop.dto.response;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
 public class ErrorResponse {
-    private String message;
-    private String error;
+
     private Integer status;
+    private String message;
     private LocalDateTime timestamp;
 
-    public ErrorResponse(String message, String error, Integer status) {
-        this.message = message;
-        this.error = error;
-        this.status = status;
+    public ErrorResponse() {
         this.timestamp = LocalDateTime.now();
+    }
+
+    public ErrorResponse(Integer status, String message) {
+        this.status = status;
+        this.message = message;
+        this.timestamp = LocalDateTime.now();
+    }
+
+    public Integer getStatus() {
+        return status;
+    }
+
+    public void setStatus(Integer status) {
+        this.status = status;
+    }
+
+    public String getMessage() {
+        return message;
+    }
+
+    public void setMessage(String message) {
+        this.message = message;
+    }
+
+    public LocalDateTime getTimestamp() {
+        return timestamp;
+    }
+
+    public void setTimestamp(LocalDateTime timestamp) {
+        this.timestamp = timestamp;
     }
 }

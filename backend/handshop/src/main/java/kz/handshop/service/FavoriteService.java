@@ -1,76 +1,112 @@
 package kz.handshop.service;
 
-import kz.handshop.exception.*;
-import kz.handshop.model.*;
-import kz.handshop.repository.*;
-import lombok.RequiredArgsConstructor;
+import kz.handshop.dto.response.MessageResponse;
+import kz.handshop.dto.response.ProductResponse;
+import kz.handshop.dto.response.SimpleUserResponse;
+import kz.handshop.dto.response.ProductImageResponse;
+import kz.handshop.entity.*;
+import kz.handshop.exception.ProductNotFoundException;
+import kz.handshop.exception.ValidationException;
+import kz.handshop.repository.FavoriteRepository;
+import kz.handshop.repository.ProductRepository;
+import kz.handshop.repository.ProductImageRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 public class FavoriteService {
 
-    private final FavoriteRepository favoriteRepository;
-    private final ProductRepository productRepository;
-    private final UserRepository userRepository;
+    @Autowired
+    private FavoriteRepository favoriteRepository;
 
-    /**
-     * Добавить товар в избранное
-     */
+    @Autowired
+    private ProductRepository productRepository;
+
+    @Autowired
+    private ProductImageRepository productImageRepository;
+
     @Transactional
-    public Favorite addToFavorites(Long userId, Long productId) {
-        // Проверка пользователя
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new UserNotFoundException("Пользователь не найден"));
-
-        // Проверка товара
+    public MessageResponse addToFavorites(Long productId, User user) {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new ProductNotFoundException("Товар не найден"));
 
-        // Товар должен быть опубликован
-        if (product.getStatus() != Product.ProductStatus.PUBLISHED) {
-            throw new InvalidStatusException("Можно добавлять только опубликованные товары");
+        // Проверка, что товар опубликован
+        if (product.getStatus() != ProductStatus.PUBLISHED) {
+            throw new ValidationException("Можно добавить в избранное только опубликованные товары");
         }
 
-        // Проверка: товар уже в избранном?
-        if (favoriteRepository.existsByUserIdAndProductId(userId, productId)) {
+        // Проверка, что товар не добавлен уже
+        if (favoriteRepository.existsByUserAndProduct(user, product)) {
             throw new ValidationException("Товар уже в избранном");
         }
 
-        // Создание избранного
-        Favorite favorite = new Favorite();
-        favorite.setUser(user);
-        favorite.setProduct(product);
+        Favorite favorite = new Favorite(user, product);
+        favoriteRepository.save(favorite);
 
-        return favoriteRepository.save(favorite);
+        return new MessageResponse("Товар добавлен в избранное");
     }
 
-    /**
-     * Удалить из избранного
-     */
     @Transactional
-    public void removeFromFavorites(Long userId, Long productId) {
-        if (!favoriteRepository.existsByUserIdAndProductId(userId, productId)) {
+    public MessageResponse removeFromFavorites(Long productId, User user) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new ProductNotFoundException("Товар не найден"));
+
+        if (!favoriteRepository.existsByUserAndProduct(user, product)) {
             throw new ValidationException("Товар не найден в избранном");
         }
 
-        favoriteRepository.deleteByUserIdAndProductId(userId, productId);
+        favoriteRepository.deleteByUserAndProduct(user, product);
+
+        return new MessageResponse("Товар удалён из избранного");
     }
 
-    /**
-     * Получить избранное пользователя
-     */
-    public List<Favorite> getUserFavorites(Long userId) {
-        return favoriteRepository.findByUserId(userId);
+    public List<ProductResponse> getUserFavorites(User user) {
+        List<Favorite> favorites = favoriteRepository.findByUser(user);
+
+        return favorites.stream()
+                .map(favorite -> convertToProductResponse(favorite.getProduct()))
+                .collect(Collectors.toList());
     }
 
-    /**
-     * Проверить, в избранном ли товар
-     */
-    public boolean isFavorite(Long userId, Long productId) {
-        return favoriteRepository.existsByUserIdAndProductId(userId, productId);
+    private ProductResponse convertToProductResponse(Product product) {
+        ProductResponse response = new ProductResponse();
+        response.setId(product.getId());
+        response.setTitle(product.getTitle());
+        response.setDescription(product.getDescription());
+        response.setMaterials(product.getMaterials());
+        response.setPrice(product.getPrice());
+        response.setProductionTime(product.getProductionTime());
+        response.setDeliveryType(product.getDeliveryType() != null ? product.getDeliveryType().name() : null);
+        response.setStatus(product.getStatus().name());
+        response.setViewsCount(product.getViewsCount());
+        response.setCreatedAt(product.getCreatedAt());
+        response.setUpdatedAt(product.getUpdatedAt());
+
+        // Freelancer info
+        SimpleUserResponse freelancerResponse = new SimpleUserResponse();
+        freelancerResponse.setId(product.getFreelancer().getId());
+        freelancerResponse.setUsername(product.getFreelancer().getUsername());
+        freelancerResponse.setAvatarUrl(product.getFreelancer().getAvatarUrl());
+        response.setFreelancer(freelancerResponse);
+
+        // Images
+        List<ProductImage> images = productImageRepository.findByProduct(product);
+        List<ProductImageResponse> imageResponses = images.stream()
+                .map(img -> {
+                    ProductImageResponse imgResp = new ProductImageResponse();
+                    imgResp.setId(img.getId());
+                    imgResp.setImageUrl(img.getImageUrl());
+                    imgResp.setIsPrimary(img.getIsPrimary());
+                    imgResp.setOrderIndex(img.getOrderIndex());
+                    return imgResp;
+                })
+                .collect(Collectors.toList());
+        response.setImages(imageResponses);
+
+        return response;
     }
 }

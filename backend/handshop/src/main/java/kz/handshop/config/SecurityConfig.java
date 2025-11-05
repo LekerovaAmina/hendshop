@@ -1,9 +1,12 @@
 package kz.handshop.config;
 
-import lombok.RequiredArgsConstructor;
+import kz.handshop.security.JwtAuthenticationFilter;
+import kz.handshop.security.UserDetailsServiceImpl;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -12,12 +15,18 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
-@RequiredArgsConstructor
 public class SecurityConfig {
+
+    @Autowired
+    private UserDetailsServiceImpl userDetailsService;
+
+    @Autowired
+    private JwtAuthenticationFilter jwtAuthenticationFilter;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -25,41 +34,48 @@ public class SecurityConfig {
     }
 
     @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
-        return config.getAuthenticationManager();
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration authConfig) throws Exception {
+        return authConfig.getAuthenticationManager();
+    }
+
+    @Bean
+    public DaoAuthenticationProvider authenticationProvider() {
+        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
+        authProvider.setUserDetailsService(userDetailsService);
+        authProvider.setPasswordEncoder(passwordEncoder());
+        return authProvider;
     }
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                .csrf(csrf -> csrf.disable()) // Отключаем CSRF для API
-                .cors(cors -> {}) // Включаем CORS (настроен в CorsConfig)
-                .sessionManagement(session ->
-                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // Без сессий (JWT)
+                .csrf(csrf -> csrf.disable())
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // Публичные endpoints (без авторизации)
-                        .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/api/products/**").permitAll() // Просмотр товаров
-                        .requestMatchers("/api/categories/**").permitAll()
-                        .requestMatchers("/uploads/**").permitAll() // Доступ к загруженным файлам
+                        // Публичные endpoints
+                        .requestMatchers("/").permitAll()
+                        .requestMatchers("/auth/**").permitAll()
+                        .requestMatchers("/products/**").permitAll()
+                        .requestMatchers("/categories/**").permitAll()
 
-                        // Endpoints для USER
-                        .requestMatchers("/api/favorites/**").hasAnyRole("USER", "FREELANCER", "ADMIN")
-                        .requestMatchers("/api/orders/my/**").hasAnyRole("USER", "FREELANCER", "ADMIN")
-                        .requestMatchers("/api/users/me/**").hasAnyRole("USER", "FREELANCER", "ADMIN")
+                        // Endpoints для пользователей
+                        .requestMatchers("/users/**").authenticated()
+                        .requestMatchers("/favorites/**").authenticated()
+                        .requestMatchers("/orders/**").authenticated()
+                        .requestMatchers("/delivery-addresses/**").authenticated()
 
-                        // Endpoints для FREELANCER
-                        .requestMatchers("/api/freelancer/**").hasAnyRole("FREELANCER", "ADMIN")
+                        // Endpoints для фрилансеров
+                        .requestMatchers("/freelancer/**").hasAnyRole("FREELANCER", "ADMIN")
 
-                        // Endpoints для ADMIN
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        // Endpoints для админов
+                        .requestMatchers("/admin/**").hasRole("ADMIN")
 
-                        // Всё остальное требует аутентификации
                         .anyRequest().authenticated()
-                );
+                )
 
-        // TODO: Добавить JWT filter после создания JwtAuthenticationFilter
-        // http.addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+                .authenticationProvider(authenticationProvider())
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+
 
         return http.build();
     }

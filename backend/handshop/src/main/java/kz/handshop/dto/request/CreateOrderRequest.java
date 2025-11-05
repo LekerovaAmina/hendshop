@@ -1,17 +1,31 @@
 package kz.handshop.dto.request;
 
-import jakarta.validation.constraints.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import jakarta.validation.constraints.NotNull;
 
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
 public class CreateOrderRequest {
+
     @NotNull(message = "ID товара обязателен")
     private Long productId;
 
     @NotNull(message = "ID адреса доставки обязателен")
     private Long deliveryAddressId;
+
+    public CreateOrderRequest() {
+    }
+
+    public Long getProductId() {
+        return productId;
+    }
+
+    public void setProductId(Long productId) {
+        this.productId = productId;
+    }
+
+    public Long getDeliveryAddressId() {
+        return deliveryAddressId;
+    }
+
+    public void setDeliveryAddressId(Long deliveryAddressId) {
+        this.deliveryAddressId = deliveryAddressId;
+    }
 }

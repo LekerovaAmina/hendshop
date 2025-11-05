@@ -1,121 +1,95 @@
 package kz.handshop.service;
 
-import kz.handshop.exception.*;
-import kz.handshop.model.*;
-import kz.handshop.repository.*;
-import lombok.RequiredArgsConstructor;
+import kz.handshop.dto.request.UpdateProfileRequest;
+import kz.handshop.dto.request.UpgradeToFreelancerRequest;
+import kz.handshop.dto.response.FreelancerProfileResponse;
+import kz.handshop.dto.response.UserResponse;
+import kz.handshop.entity.*;
+import kz.handshop.exception.ValidationException;
+import kz.handshop.repository.FreelancerProfileRepository;
+import kz.handshop.repository.SubscriptionRepository;
+import kz.handshop.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
 @Service
-@RequiredArgsConstructor
 public class UserService {
 
-    private final UserRepository userRepository;
-    private final FreelancerProfileRepository freelancerProfileRepository;
-    private final SubscriptionRepository subscriptionRepository;
+    @Autowired
+    private UserRepository userRepository;
 
-    /**
-     * Получить пользователя по ID
-     */
-    public User getUserById(Long id) {
-        return userRepository.findById(id)
-                .orElseThrow(() -> new UserNotFoundException("Пользователь не найден"));
+    @Autowired
+    private FreelancerProfileRepository freelancerProfileRepository;
+
+    @Autowired
+    private SubscriptionRepository subscriptionRepository;
+
+    public UserResponse getUserProfile(User user) {
+        UserResponse response = new UserResponse();
+        response.setId(user.getId());
+        response.setEmail(user.getEmail());
+        response.setUsername(user.getUsername());
+        response.setAvatarUrl(user.getAvatarUrl());
+        response.setRole(user.getRole().name());
+        response.setCreatedAt(user.getCreatedAt());
+        return response;
     }
 
-    /**
-     * Получить пользователя по email
-     */
-    public User getUserByEmail(String email) {
-        return userRepository.findByEmail(email)
-                .orElseThrow(() -> new UserNotFoundException("Пользователь не найден"));
-    }
-
-    /**
-     * Обновить профиль пользователя
-     */
     @Transactional
-    public User updateProfile(Long userId, String username, String avatarUrl) {
-        User user = getUserById(userId);
-
-        if (username != null && !username.trim().isEmpty()) {
-            user.setUsername(username);
+    public UserResponse updateProfile(UpdateProfileRequest request, User user) {
+        if (request.getUsername() != null && !request.getUsername().isEmpty()) {
+            user.setUsername(request.getUsername());
         }
 
-        if (avatarUrl != null && !avatarUrl.trim().isEmpty()) {
-            user.setAvatarUrl(avatarUrl);
+        if (request.getAvatarUrl() != null) {
+            user.setAvatarUrl(request.getAvatarUrl());
         }
 
-        return userRepository.save(user);
+        user = userRepository.save(user);
+        return getUserProfile(user);
     }
 
-    /**
-     * Повысить пользователя до фрилансера
-     */
     @Transactional
-    public User upgradeToFreelancer(Long userId, String shopName, String shopDescription) {
-        User user = getUserById(userId);
-
-        // Проверка: пользователь уже фрилансер?
-        if (user.isFreelancer()) {
-            throw new ValidationException("Пользователь уже является фрилансером");
+    public FreelancerProfileResponse upgradeToFreelancer(UpgradeToFreelancerRequest request, User user) {
+        // Проверка, что пользователь не является уже фрилансером
+        if (user.getRole() == UserRole.FREELANCER || user.getRole() == UserRole.ADMIN) {
+            throw new ValidationException("Вы уже являетесь фрилансером");
         }
 
-        // Смена роли
-        user.setRole(User.Role.FREELANCER);
+        // Обновление роли
+        user.setRole(UserRole.FREELANCER);
         user = userRepository.save(user);
 
         // Создание профиля фрилансера
         FreelancerProfile profile = new FreelancerProfile();
         profile.setUser(user);
-        profile.setShopName(shopName);
-        profile.setShopDescription(shopDescription);
+        profile.setShopName(request.getShopName());
+        profile.setShopDescription(request.getShopDescription());
         profile.setOrderLimit(5);
-        profile.setRating(0.0);
-        profile.setTotalOrders(0);
-        freelancerProfileRepository.save(profile);
 
-        // Активация подписки
+        profile = freelancerProfileRepository.save(profile);
+
+        // Создание активной подписки на 30 дней
         Subscription subscription = new Subscription();
         subscription.setUser(user);
         subscription.setIsActive(true);
         subscription.setStartedAt(LocalDateTime.now());
-        subscription.setExpiresAt(LocalDateTime.now().plusMonths(1));
+        subscription.setExpiresAt(LocalDateTime.now().plusDays(30));
+
         subscriptionRepository.save(subscription);
 
-        return user;
-    }
+        // Формирование ответа
+        FreelancerProfileResponse response = new FreelancerProfileResponse();
+        response.setId(profile.getId());
+        response.setShopName(profile.getShopName());
+        response.setShopDescription(profile.getShopDescription());
+        response.setOrderLimit(profile.getOrderLimit());
+        response.setRating(profile.getRating());
+        response.setTotalOrders(profile.getTotalOrders());
 
-    /**
-     * Получить профиль фрилансера
-     */
-    public FreelancerProfile getFreelancerProfile(Long userId) {
-        return freelancerProfileRepository.findByUserId(userId)
-                .orElseThrow(() -> new UserNotFoundException("Профиль фрилансера не найден"));
-    }
-
-    /**
-     * Обновить профиль фрилансера
-     */
-    @Transactional
-    public FreelancerProfile updateFreelancerProfile(Long userId, String shopName,
-                                                     String shopDescription, Integer orderLimit) {
-        FreelancerProfile profile = getFreelancerProfile(userId);
-
-        if (shopName != null && !shopName.trim().isEmpty()) {
-            profile.setShopName(shopName);
-        }
-
-        if (shopDescription != null) {
-            profile.setShopDescription(shopDescription);
-        }
-
-        if (orderLimit != null && orderLimit >= 1 && orderLimit <= 50) {
-            profile.setOrderLimit(orderLimit);
-        }
-
-        return freelancerProfileRepository.save(profile);
+        return response;
     }
 }

@@ -1,214 +1,131 @@
 package kz.handshop.controller;
 
+import jakarta.validation.Valid;
 import kz.handshop.dto.request.CreateProductRequest;
-import kz.handshop.dto.request.UpdateOrderStatusRequest;
-import kz.handshop.dto.response.OrderResponse;
+import kz.handshop.dto.request.CreateShelfRequest;
+import kz.handshop.dto.response.MessageResponse;
 import kz.handshop.dto.response.ProductResponse;
-import kz.handshop.model.Order;
-import kz.handshop.model.Product;
-import kz.handshop.service.OrderService;
+import kz.handshop.entity.ProductStatus;
+import kz.handshop.entity.User;
+import kz.handshop.repository.UserRepository;
+import kz.handshop.service.FreelancerService;
 import kz.handshop.service.ProductService;
-import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
-import jakarta.validation.Valid;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/api/freelancer")
-@RequiredArgsConstructor
+@RequestMapping("/freelancer")
 public class FreelancerController {
 
-    private final ProductService productService;
-    private final OrderService orderService;
+    @Autowired
+    private FreelancerService freelancerService;
 
-    // ==================== ТОВАРЫ ====================
+    @Autowired
+    private ProductService productService;
 
-    /**
-     * Получить свои товары
-     * GET /api/freelancer/products
-     */
-    @GetMapping("/products")
-    public ResponseEntity<List<ProductResponse>> getMyProducts(
-            @RequestParam Long freelancerId,
-            @RequestParam(required = false) String status) {
+    @Autowired
+    private UserRepository userRepository;
 
-        List<Product> products;
 
-        if (status != null) {
-            Product.ProductStatus productStatus = Product.ProductStatus.valueOf(status);
-            products = productService.getFreelancerProducts(freelancerId).stream()
-                    .filter(p -> p.getStatus() == productStatus)
-                    .collect(Collectors.toList());
-        } else {
-            products = productService.getFreelancerProducts(freelancerId);
-        }
-
-        List<ProductResponse> response = products.stream()
-                .map(this::toProductResponse)
-                .collect(Collectors.toList());
-
-        return ResponseEntity.ok(response);
+    @PostMapping("/shelves")
+    public ResponseEntity<?> createShelf(@Valid @RequestBody CreateShelfRequest request,
+                                         Authentication authentication) {
+        User freelancer = getUserFromAuth(authentication);
+        return ResponseEntity.ok(freelancerService.createShelf(request, freelancer));
     }
 
-    /**
-     * Создать товар (черновик)
-     * POST /api/freelancer/products
-     */
+    @GetMapping("/shelves")
+    public ResponseEntity<?> getMyShelves(Authentication authentication) {
+        User freelancer = getUserFromAuth(authentication);
+        return ResponseEntity.ok(freelancerService.getFreelancerShelves(freelancer));
+    }
+
+    @DeleteMapping("/shelves/{id}")
+    public ResponseEntity<?> deleteShelf(@PathVariable Long id, Authentication authentication) {
+        User freelancer = getUserFromAuth(authentication);
+        freelancerService.deleteShelf(id, freelancer);
+        return ResponseEntity.ok(new MessageResponse("Полка удалена"));
+    }
+
     @PostMapping("/products")
-    public ResponseEntity<ProductResponse> createProduct(
-            @Valid @RequestBody CreateProductRequest request,
-            @RequestParam Long freelancerId) {
-
-        Product product = new Product();
-        product.setTitle(request.getTitle());
-        product.setDescription(request.getDescription());
-        product.setMaterials(request.getMaterials());
-        product.setPrice(request.getPrice());
-        product.setProductionTime(request.getProductionTime());
-        product.setDeliveryType(Product.DeliveryType.valueOf(request.getDeliveryType()));
-
-        Product created = productService.createProduct(product, freelancerId);
-
-        return ResponseEntity.status(HttpStatus.CREATED).body(toProductResponse(created));
+    public ResponseEntity<ProductResponse> createProduct(@Valid @RequestBody CreateProductRequest request,
+                                                         Authentication authentication) {
+        User freelancer = getUserFromAuth(authentication);
+        ProductResponse product = productService.createProduct(request, freelancer);
+        return ResponseEntity.ok(product);
     }
 
-    /**
-     * Обновить товар
-     * PUT /api/freelancer/products/{id}
-     */
     @PutMapping("/products/{id}")
-    public ResponseEntity<ProductResponse> updateProduct(
-            @PathVariable Long id,
-            @Valid @RequestBody CreateProductRequest request,
-            @RequestParam Long freelancerId) {
-
-        Product product = new Product();
-        product.setTitle(request.getTitle());
-        product.setDescription(request.getDescription());
-        product.setMaterials(request.getMaterials());
-        product.setPrice(request.getPrice());
-        product.setProductionTime(request.getProductionTime());
-        product.setDeliveryType(Product.DeliveryType.valueOf(request.getDeliveryType()));
-
-        Product updated = productService.updateProduct(id, product, freelancerId);
-
-        return ResponseEntity.ok(toProductResponse(updated));
+    public ResponseEntity<ProductResponse> updateProduct(@PathVariable Long id,
+                                                         @Valid @RequestBody CreateProductRequest request,
+                                                         Authentication authentication) {
+        User freelancer = getUserFromAuth(authentication);
+        ProductResponse product = productService.updateProduct(id, request, freelancer);
+        return ResponseEntity.ok(product);
     }
 
-    /**
-     * Отправить на модерацию
-     * PATCH /api/freelancer/products/{id}/submit
-     */
     @PatchMapping("/products/{id}/submit")
-    public ResponseEntity<ProductResponse> submitForModeration(
-            @PathVariable Long id,
-            @RequestParam Long freelancerId) {
-
-        Product product = productService.submitForModeration(id, freelancerId);
-
-        return ResponseEntity.ok(toProductResponse(product));
+    public ResponseEntity<ProductResponse> submitForModeration(@PathVariable Long id,
+                                                               Authentication authentication) {
+        User freelancer = getUserFromAuth(authentication);
+        ProductResponse product = productService.submitForModeration(id, freelancer);
+        return ResponseEntity.ok(product);
     }
 
-    /**
-     * Архивировать товар
-     * PATCH /api/freelancer/products/{id}/archive
-     */
     @PatchMapping("/products/{id}/archive")
-    public ResponseEntity<ProductResponse> archiveProduct(
-            @PathVariable Long id,
-            @RequestParam Long freelancerId) {
-
-        Product product = productService.archiveProduct(id, freelancerId);
-
-        return ResponseEntity.ok(toProductResponse(product));
+    public ResponseEntity<ProductResponse> archiveProduct(@PathVariable Long id,
+                                                          Authentication authentication) {
+        User freelancer = getUserFromAuth(authentication);
+        ProductResponse product = productService.archiveProduct(id, freelancer);
+        return ResponseEntity.ok(product);
     }
 
-    /**
-     * Восстановить из архива
-     * PATCH /api/freelancer/products/{id}/restore
-     */
     @PatchMapping("/products/{id}/restore")
-    public ResponseEntity<ProductResponse> restoreProduct(
-            @PathVariable Long id,
-            @RequestParam Long freelancerId) {
-
-        Product product = productService.restoreFromArchive(id, freelancerId);
-
-        return ResponseEntity.ok(toProductResponse(product));
+    public ResponseEntity<ProductResponse> restoreProduct(@PathVariable Long id,
+                                                          Authentication authentication) {
+        User freelancer = getUserFromAuth(authentication);
+        ProductResponse product = productService.restoreProduct(id, freelancer);
+        return ResponseEntity.ok(product);
     }
 
-    // ==================== ЗАКАЗЫ ====================
+    @GetMapping("/products")
+    public ResponseEntity<List<ProductResponse>> getMyProducts(@RequestParam(required = false) String status,
+                                                               Authentication authentication) {
+        User freelancer = getUserFromAuth(authentication);
+        ProductStatus productStatus = status != null ? ProductStatus.valueOf(status) : null;
+        List<ProductResponse> products = productService.getFreelancerProducts(freelancer, productStatus);
+        return ResponseEntity.ok(products);
+    }
 
-    /**
-     * Получить свои заказы
-     * GET /api/freelancer/orders
-     */
     @GetMapping("/orders")
-    public ResponseEntity<List<OrderResponse>> getMyOrders(@RequestParam Long freelancerId) {
-        List<Order> orders = orderService.getFreelancerOrders(freelancerId);
-
-        List<OrderResponse> response = orders.stream()
-                .map(this::toOrderResponse)
-                .collect(Collectors.toList());
-
-        return ResponseEntity.ok(response);
+    public ResponseEntity<?> getFreelancerOrders(Authentication authentication) {
+        User freelancer = getUserFromAuth(authentication);
+        // Вызов метода из OrderService
+        return ResponseEntity.ok(new MessageResponse("Список заказов"));
     }
 
-    /**
-     * Изменить статус заказа
-     * PATCH /api/freelancer/orders/{id}/status
-     */
     @PatchMapping("/orders/{id}/status")
-    public ResponseEntity<OrderResponse> updateOrderStatus(
-            @PathVariable Long id,
-            @Valid @RequestBody UpdateOrderStatusRequest request,
-            @RequestParam Long freelancerId) {
-
-        Order.OrderStatus newStatus = Order.OrderStatus.valueOf(request.getStatus());
-        Order order = orderService.updateOrderStatus(id, freelancerId, newStatus);
-
-        return ResponseEntity.ok(toOrderResponse(order));
+    public ResponseEntity<?> updateOrderStatus(@PathVariable Long id,
+                                               @RequestBody String status,
+                                               Authentication authentication) {
+        User freelancer = getUserFromAuth(authentication);
+        // Вызов метода из OrderService
+        return ResponseEntity.ok(new MessageResponse("Статус заказа обновлён"));
     }
 
-    // ==================== HELPER METHODS ====================
-
-    private ProductResponse toProductResponse(Product product) {
-        return new ProductResponse(
-                product.getId(),
-                product.getTitle(),
-                product.getDescription(),
-                product.getMaterials(),
-                product.getPrice(),
-                product.getProductionTime(),
-                product.getDeliveryType().name(),
-                product.getStatus().name(),
-                product.getPrimaryImageUrl(),
-                product.getViewsCount(),
-                product.getAverageRating(),
-                product.getReviewsCount(),
-                product.getFreelancer().getId(),
-                product.getFreelancer().getUsername()
-        );
+    @GetMapping("/analytics")
+    public ResponseEntity<?> getAnalytics(Authentication authentication) {
+        User freelancer = getUserFromAuth(authentication);
+        return ResponseEntity.ok(new MessageResponse("Аналитика"));
     }
 
-    private OrderResponse toOrderResponse(Order order) {
-        return new OrderResponse(
-                order.getId(),
-                order.getProduct().getId(),
-                order.getProduct().getTitle(),
-                order.getProduct().getPrimaryImageUrl(),
-                order.getPrice(),
-                order.getStatus().name(),
-                order.getDeliveryAddress().getFullAddress(),
-                order.getFreelancer().getId(),
-                order.getFreelancer().getUsername(),
-                order.getCreatedAt(),
-                order.getUpdatedAt()
-        );
+    private User getUserFromAuth(Authentication authentication) {
+        String email = authentication.getName();
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
     }
 }

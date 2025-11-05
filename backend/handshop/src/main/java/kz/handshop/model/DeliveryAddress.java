@@ -1,20 +1,10 @@
-package kz.handshop.model;
+package kz.handshop.entity;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
-
 import java.time.LocalDateTime;
-import java.util.HashSet;
-import java.util.Set;
 
 @Entity
 @Table(name = "delivery_addresses")
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
 public class DeliveryAddress {
 
     @Id
@@ -22,47 +12,110 @@ public class DeliveryAddress {
     private Long id;
 
     @ManyToOne
-    @JoinColumn(name = "user_id", nullable = false)
+    @JoinColumn(name = "user_id")
     private User user;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 100)
     private String city;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 150)
     private String street;
 
-    @Column(nullable = false)
+    @Column(length = 50)
     private String building;
 
-    @Column
+    @Column(length = 50)
     private String apartment;
 
-    @Column(name = "postal_code")
+    @Column(name = "postal_code", length = 20)
     private String postalCode;
 
-    @Column(name = "is_default", nullable = false)
+    @Column(name = "is_default")
     private Boolean isDefault = false;
 
-    @CreationTimestamp
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    @Column(name = "created_at")
+    private LocalDateTime createdAt = LocalDateTime.now();
 
-    // Связь один-ко-многим с заказами
-    @OneToMany(mappedBy = "deliveryAddress", cascade = CascadeType.ALL)
-    private Set<Order> orders = new HashSet<>();
+    // Constructors
+    public DeliveryAddress() {
+    }
 
-    // Helper методы
-    public String getFullAddress() {
-        StringBuilder address = new StringBuilder();
-        address.append(city).append(", ");
-        address.append(street).append(", ");
-        address.append(building);
-        if (apartment != null && !apartment.isEmpty()) {
-            address.append(", кв. ").append(apartment);
-        }
-        if (postalCode != null && !postalCode.isEmpty()) {
-            address.append(", ").append(postalCode);
-        }
-        return address.toString();
+    public DeliveryAddress(User user, String city, String street) {
+        this.user = user;
+        this.city = city;
+        this.street = street;
+    }
+
+    // Getters and Setters
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public User getUser() {
+        return user;
+    }
+
+    public void setUser(User user) {
+        this.user = user;
+    }
+
+    public String getCity() {
+        return city;
+    }
+
+    public void setCity(String city) {
+        this.city = city;
+    }
+
+    public String getStreet() {
+        return street;
+    }
+
+    public void setStreet(String street) {
+        this.street = street;
+    }
+
+    public String getBuilding() {
+        return building;
+    }
+
+    public void setBuilding(String building) {
+        this.building = building;
+    }
+
+    public String getApartment() {
+        return apartment;
+    }
+
+    public void setApartment(String apartment) {
+        this.apartment = apartment;
+    }
+
+    public String getPostalCode() {
+        return postalCode;
+    }
+
+    public void setPostalCode(String postalCode) {
+        this.postalCode = postalCode;
+    }
+
+    public Boolean getIsDefault() {
+        return isDefault;
+    }
+
+    public void setIsDefault(Boolean isDefault) {
+        this.isDefault = isDefault;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
     }
 }
