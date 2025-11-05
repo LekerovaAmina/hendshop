@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/freelancer")
+@RequestMapping("api/freelancer")
 public class FreelancerController {
 
     @Autowired
@@ -51,7 +51,7 @@ public class FreelancerController {
         return ResponseEntity.ok(new MessageResponse("Полка удалена"));
     }
 
-    @PostMapping("/products")
+    @PostMapping("/api/products")
     public ResponseEntity<ProductResponse> createProduct(@Valid @RequestBody CreateProductRequest request,
                                                          Authentication authentication) {
         User freelancer = getUserFromAuth(authentication);
@@ -92,7 +92,7 @@ public class FreelancerController {
         return ResponseEntity.ok(product);
     }
 
-    @GetMapping("/products")
+    @GetMapping("/api/products")
     public ResponseEntity<List<ProductResponse>> getMyProducts(@RequestParam(required = false) String status,
                                                                Authentication authentication) {
         User freelancer = getUserFromAuth(authentication);
@@ -101,7 +101,7 @@ public class FreelancerController {
         return ResponseEntity.ok(products);
     }
 
-    @GetMapping("/orders")
+    @GetMapping("/api/orders")
     public ResponseEntity<?> getFreelancerOrders(Authentication authentication) {
         User freelancer = getUserFromAuth(authentication);
         // Вызов метода из OrderService

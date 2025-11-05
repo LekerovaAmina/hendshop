@@ -1,5 +1,6 @@
 package kz.handshop.config;
 
+
 import kz.handshop.security.JwtAuthenticationFilter;
 import kz.handshop.security.UserDetailsServiceImpl;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,6 +17,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
 
 @Configuration
 @EnableWebSecurity
@@ -47,28 +49,45 @@ public class SecurityConfig {
     }
 
     @Bean
+    public WebSecurityCustomizer webSecurityCustomizer() {
+        return (web) -> web.ignoring()
+                .requestMatchers(
+                        //"/admin/**",
+                        "/css/**",
+                        "/js/**",
+                        "/images/**",
+                        "/favicon.ico"
+                );
+    }
+
+
+    @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // Публичные endpoints
-                        .requestMatchers("/").permitAll()
-                        .requestMatchers("/auth/**").permitAll()
-                        .requestMatchers("/products/**").permitAll()
-                        .requestMatchers("/categories/**").permitAll()
+                        // перенаправляет JS
+                        .requestMatchers("/admin/index.html").permitAll()
+                        .requestMatchers("/admin/**").permitAll()
+                        .requestMatchers("/login.html").permitAll()
 
-                        // Endpoints для пользователей
-                        .requestMatchers("/users/**").authenticated()
-                        .requestMatchers("/favorites/**").authenticated()
-                        .requestMatchers("/orders/**").authenticated()
-                        .requestMatchers("/delivery-addresses/**").authenticated()
+                        // 2. Публичные API endpoints
+                        .requestMatchers("/api/auth/**").permitAll()//
+                        .requestMatchers("/api/products/**").permitAll()//
+                        .requestMatchers("/api/categories/**").permitAll()//
 
-                        // Endpoints для фрилансеров
-                        .requestMatchers("/freelancer/**").hasAnyRole("FREELANCER", "ADMIN")
+                        // 3. Endpoints для пользователей
+                        .requestMatchers("/api/users/**").authenticated()
+                        .requestMatchers("/api/favorites/**").authenticated()//
+                        .requestMatchers("/api/orders/**").authenticated()//
+                        .requestMatchers("/api/delivery-addresses/**").authenticated()
 
-                        // Endpoints для админов
-                        .requestMatchers("/admin/**").hasRole("ADMIN")
+                        // 4. Endpoints для фрилансеров
+                        .requestMatchers("/api/freelancer/**").hasAnyRole("FREELANCER", "ADMIN")//
+
+                        // 5. Endpoints для админов
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
 
                         .anyRequest().authenticated()
                 )

@@ -3,6 +3,10 @@ package kz.handshop.entity;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "products")
@@ -39,8 +43,9 @@ public class Product {
     @Column(name = "delivery_type", length = 20)
     private DeliveryType deliveryType;
 
-    @Enumerated(EnumType.STRING)
-    @Column(columnDefinition = "product_status")
+    //@Enumerated(EnumType.STRING)
+    //@Column(columnDefinition = "product_status")
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     private ProductStatus status = ProductStatus.DRAFT;
 
     @Column(name = "views_count")
