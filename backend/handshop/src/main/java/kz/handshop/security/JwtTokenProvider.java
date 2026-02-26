@@ -2,6 +2,7 @@ package kz.handshop.security;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
@@ -10,6 +11,7 @@ import java.security.Key;
 import java.util.Date;
 
 @Component
+@Slf4j
 public class JwtTokenProvider {
 
     @Value("${jwt.secret}")
@@ -66,13 +68,13 @@ public class JwtTokenProvider {
                     .parseClaimsJws(token);
             return true;
         } catch (MalformedJwtException ex) {
-            System.err.println("Invalid JWT token");
+            log.warn("Invalid JWT token: malformed", ex);
         } catch (ExpiredJwtException ex) {
-            System.err.println("Expired JWT token");
+            log.warn("Expired JWT token", ex);
         } catch (UnsupportedJwtException ex) {
-            System.err.println("Unsupported JWT token");
+            log.warn("Unsupported JWT token", ex);
         } catch (IllegalArgumentException ex) {
-            System.err.println("JWT claims string is empty");
+            log.warn("JWT token validation failed: claims string is empty", ex);
         }
         return false;
     }

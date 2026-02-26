@@ -8,35 +8,31 @@ import kz.handshop.exception.InvalidStatusException;
 import kz.handshop.exception.ProductNotFoundException;
 import kz.handshop.exception.ShelfNotFoundException;
 import kz.handshop.repository.*;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
+@Slf4j
 public class ProductService {
 
-    @Autowired
-    private ProductRepository productRepository;
+    private final ProductRepository productRepository;
 
-    @Autowired
-    private FreelancerShelfRepository shelfRepository;
+    private final FreelancerShelfRepository shelfRepository;
 
-    @Autowired
-    private ProductImageRepository productImageRepository;
+    private final ProductImageRepository productImageRepository;
 
-    @Autowired
-    private ProductModerationRepository moderationRepository;
+    private final ProductModerationRepository moderationRepository;
 
-    @Autowired
-    private ProductReviewRepository reviewRepository;
+    private final ProductReviewRepository reviewRepository;
 
-    @Autowired
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
 
     // Получить все опубликованные товары (публичный endpoint)
     public List<ProductResponse> getAllPublishedProducts(Long categoryId, String search) {
@@ -55,6 +51,7 @@ public class ProductService {
         // Увеличить счётчик просмотров
         product.setViewsCount(product.getViewsCount() + 1);
         productRepository.save(product);
+        log.debug("Incremented view count for product id={}, views={}", product.getId(), product.getViewsCount());
 
         return convertToDetailedResponse(product);
     }
@@ -84,6 +81,8 @@ public class ProductService {
         }
 
         product = productRepository.save(product);
+        log.info("Created product id={} by freelancerId={}, status={}", product.getId(),
+                freelancer.getId(), product.getStatus());
         return convertToResponse(product);
     }
 
@@ -115,6 +114,8 @@ public class ProductService {
         }
 
         product = productRepository.save(product);
+        log.info("Updated product id={} by freelancerId={}, status={}", product.getId(),
+                freelancer.getId(), product.getStatus());
         return convertToResponse(product);
     }
 
@@ -134,6 +135,7 @@ public class ProductService {
 
         product.setStatus(ProductStatus.MODERATION);
         product = productRepository.save(product);
+        log.info("Product id={} moved to MODERATION by freelancerId={}", product.getId(), freelancer.getId());
 
         // Создать запись в модерации
         ProductModeration moderation = new ProductModeration();
@@ -161,6 +163,7 @@ public class ProductService {
 
         product.setStatus(ProductStatus.ARCHIVED);
         product = productRepository.save(product);
+        log.info("Product id={} archived by freelancerId={}", product.getId(), freelancer.getId());
 
         return convertToResponse(product);
     }
@@ -181,6 +184,7 @@ public class ProductService {
 
         product.setStatus(ProductStatus.PUBLISHED);
         product = productRepository.save(product);
+        log.info("Product id={} restored to PUBLISHED by freelancerId={}", product.getId(), freelancer.getId());
 
         return convertToResponse(product);
     }

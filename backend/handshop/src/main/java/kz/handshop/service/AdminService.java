@@ -11,7 +11,8 @@ import kz.handshop.exception.CategoryNotFoundException;
 import kz.handshop.exception.ProductNotFoundException;
 import kz.handshop.exception.ValidationException;
 import kz.handshop.repository.*;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,22 +20,19 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
+@Slf4j
 public class AdminService {
 
-    @Autowired
-    private GlobalCategoryRepository categoryRepository;
+    private final GlobalCategoryRepository categoryRepository;
 
-    @Autowired
-    private ProductRepository productRepository;
+    private final ProductRepository productRepository;
 
-    @Autowired
-    private ProductModerationRepository moderationRepository;
+    private final ProductModerationRepository moderationRepository;
 
-    @Autowired
-    private ProductReportRepository reportRepository;
+    private final ProductReportRepository reportRepository;
 
-    @Autowired
-    private ProductImageRepository imageRepository;
+    private final ProductImageRepository imageRepository;
 
     // 1111111111111111111111111111111111111 Категории
 
@@ -90,6 +88,9 @@ public class AdminService {
         moderation.setAction(ModerationAction.APPROVE);
         moderationRepository.save(moderation);
 
+        log.info("Admin id={} approved product id={}, status now={}",
+                admin.getId(), product.getId(), product.getStatus());
+
         return convertToProductResponse(product);
     }
 
@@ -116,6 +117,9 @@ public class AdminService {
         moderation.setAction(ModerationAction.REJECT);
         moderation.setComment(comment);
         moderationRepository.save(moderation);
+
+        log.info("Admin id={} rejected product id={} with comment='{}', status now={}",
+                admin.getId(), product.getId(), comment, product.getStatus());
 
         return convertToProductResponse(product);
     }
@@ -145,6 +149,8 @@ public class AdminService {
         reports.forEach(report -> report.setIsReviewed(true));
         reportRepository.saveAll(reports);
 
+        log.info("Rejected reports for product id={}, restored to PUBLISHED", productId);
+
         return new MessageResponse("Жалобы отклонены, товар разблокирован");
     }
 
@@ -172,6 +178,8 @@ public class AdminService {
         moderation.setAdmin(admin);
         moderation.setAction(ModerationAction.DELETE);
         moderationRepository.save(moderation);
+
+        log.info("Accepted reports and deleted product id={} by admin id={}", productId, admin.getId());
 
         return new MessageResponse("Жалобы приняты, товар удалён");
     }

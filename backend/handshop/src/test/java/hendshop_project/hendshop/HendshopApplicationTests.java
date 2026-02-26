@@ -8,6 +8,7 @@ class HandShopApplicationTests {
 
     @Test
     void contextLoads() {
+
         // Просто проверяет, что приложение запускается
     }
 }

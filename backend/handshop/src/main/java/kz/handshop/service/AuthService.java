@@ -11,7 +11,7 @@ import kz.handshop.repository.FreelancerProfileRepository;
 import kz.handshop.repository.SubscriptionRepository;
 import kz.handshop.repository.UserRepository;
 import kz.handshop.security.JwtTokenProvider;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -23,9 +23,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 
 @Service
+@Slf4j
 public class AuthService {
 
-    @Autowired
+/*    @Autowired
     private UserRepository userRepository;
 
     @Autowired
@@ -41,7 +42,29 @@ public class AuthService {
     private AuthenticationManager authenticationManager;
 
     @Autowired
-    private JwtTokenProvider jwtTokenProvider;
+    private JwtTokenProvider jwtTokenProvider;*/
+
+    private final UserRepository userRepository;
+    private final FreelancerProfileRepository freelancerProfileRepository;
+    private final SubscriptionRepository subscriptionRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final AuthenticationManager authenticationManager;
+    private final JwtTokenProvider jwtTokenProvider;
+
+    public AuthService(UserRepository userRepository,
+                       FreelancerProfileRepository freelancerProfileRepository,
+                       SubscriptionRepository subscriptionRepository,
+                       PasswordEncoder passwordEncoder,
+                       AuthenticationManager authenticationManager,
+                       JwtTokenProvider jwtTokenProvider) {
+
+        this.userRepository = userRepository;
+        this.freelancerProfileRepository = freelancerProfileRepository;
+        this.subscriptionRepository = subscriptionRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.authenticationManager = authenticationManager;
+        this.jwtTokenProvider = jwtTokenProvider;
+        }
 
     @Transactional
     public AuthResponse registerUser(RegisterRequest request) {
@@ -58,6 +81,8 @@ public class AuthService {
         user.setRole(UserRole.USER);
 
         user = userRepository.save(user);
+
+        log.info("Registered new user: id={}, email={}, role={}", user.getId(), user.getEmail(), user.getRole());
 
         // Генерация токена
         String token = jwtTokenProvider.generateTokenFromEmail(user.getEmail());
@@ -107,6 +132,9 @@ public class AuthService {
 
         subscriptionRepository.save(subscription);
 
+        log.info("Registered new freelancer: userId={}, email={}, freelancerProfileId={}",
+                user.getId(), user.getEmail(), profile.getId());
+
         // Генерация токена
         String token = jwtTokenProvider.generateTokenFromEmail(user.getEmail());
 
@@ -142,10 +170,15 @@ public class AuthService {
 
         // Генерация токена
         String token = jwtTokenProvider.generateToken(authentication);
+    //    String accessToken = jwtTokenProvider.generateAccessToken(authentication);
+   //     String refreshToken = jwtTokenProvider.generateRefreshToken(authentication);
+
 
         // Получение пользователя
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new RuntimeException("User not found"));
+
+        log.info("User logged in: id={}, email={}, role={}", user.getId(), user.getEmail(), user.getRole());
 
         // Формирование ответа
         AuthResponse response = new AuthResponse();

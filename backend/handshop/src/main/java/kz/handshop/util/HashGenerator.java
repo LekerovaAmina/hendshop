@@ -1,11 +1,13 @@
 package kz.handshop.util;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
+@Slf4j
 public class HashGenerator {
     public static void main(String[] args) {
         BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
         String hash = encoder.encode("admin123");
-        System.out.println("BCrypt hash for admin123: " + hash);
+        log.info("BCrypt hash for admin123: {}", hash);
     }
 }
