@@ -1,27 +1,16 @@
-# 🌟 Project Structure
+# untitled_handshop
 
-## 📁 Folders
-- **frontend/** — Flutter mobile app
-- **backend/** — Spring Boot REST API
-- **docs/** — Documentation, API specs, diagrams
+A new Flutter project.
 
----
-## 🚀 How to Run
+## Getting Started
 
-### Backend
-```bash
-cd backend
-./mvnw spring-boot:run
-```
+This project is a starting point for a Flutter application.
 
-### Frontend
-```bash
-cd frontend
-flutter run
-```
+A few resources to get you started if this is your first Flutter project:
 
----
-## 💡 Notes
-- Don't forget to configure `.gitignore` for each project.
-- Backend should run on `localhost:8080` by default.
-- Frontend connects to backend via API URL.
+- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
+- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+
+For help getting started with Flutter development, view the
+[online documentation](https://docs.flutter.dev/), which offers tutorials,
+samples, guidance on mobile development, and a full API reference.
