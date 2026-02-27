@@ -1,16 +1,87 @@
-# untitled_handshop
+# HandShop — Marketplace for Handmade Products
 
-A new Flutter project.
+> Комплексная экосистема для продажи и покупки уникальных товаров ручной работы.  
+> Проект включает серверную часть, мобильное приложение и панель администратора.
 
-## Getting Started
+---
 
-This project is a starting point for a Flutter application.
+##  Стек технологий
 
-A few resources to get you started if this is your first Flutter project:
+| Слой | Технологии |
+|------|-----------|
+| **Backend** | Java 21, Spring Boot 3.4.x, Spring Security (JWT) |
+| **Database** | PostgreSQL |
+| **DevOps** | Docker, Docker Compose, Maven |
+| **Mobile** | Flutter (Dart) |
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+---
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+##  Запуск проекта
+
+### Вариант 1 — Docker (рекомендуется)
+
+Самый простой способ: всё окружение настроится автоматически.
+
+**Требования:** установленный и запущенный Docker Desktop.
+
+```bash
+docker-compose up --build
+```
+
+После запуска API будет доступно по адресу: **http://localhost:8080**
+
+---
+
+### Вариант 2 — Локальный запуск (для разработки)
+
+Подходит для запуска напрямую через IDE (IntelliJ IDEA / Eclipse).
+
+1. Убедитесь, что запущена база данных **PostgreSQL**.
+2. В файле `src/main/resources/application-dev.properties` укажите параметры подключения:
+
+```properties
+spring.datasource.url=jdbc:postgresql://localhost:5432/handshop_db
+```
+
+3. Запустите проект:
+
+```bash
+mvn spring-boot:run
+```
+
+---
+
+##  Тесты
+
+В проекте реализовано **более 20 тестов**: интеграционные тесты API и unit-тесты сервисов (Auth, Product).
+
+```bash
+mvn test
+```
+
+---
+
+##  Логирование
+
+Система ведёт подробный журнал действий: вход, регистрация, создание заказов.
+
+- Логи сохраняются в директорию `/logs`
+- Настроено автоматическое удаление логов старше **30 дней** — предотвращает переполнение дискового пространства на сервере
+
+---
+
+##  Структура проекта
+
+```
+src/main/java/
+├── entity/        # Модели данных (User, Product, Order и др.)
+├── controller/    # REST-контроллеры
+├── security/      # Конфигурация JWT и прав доступа
+└── service/       # Бизнес-логика
+```
+
+---
+
+##  Команда
+
+Проект выполнен студентами группы **ПО2306** в рамках модуля «Рефакторинг программного кода».
